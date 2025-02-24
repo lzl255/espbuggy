@@ -18,10 +18,11 @@ class SpeedMeter {
 protected:
   QEI qei;
   float speed;
+  float distance;
   Ticker ticker;
   int previous_ticks;
   float sampling_period;
-  float correction_factor;
+  float speed_correction_factor;
 
 private:
   void ticker_callback();
@@ -47,8 +48,21 @@ public:
   static SpeedMeter *for_encoder_b(float sampling_period = 0.04f);
 
   /**
-      Get the current speed.
-      @returns the speed, in m/s.
-  */
+   * Get the current speed.
+   * @returns the speed, in m/s.
+   */
   float get_speed() const;
+
+  /**
+   * Reset the accumulated distance to zero.
+   * @see Speedmeter::get_distance
+   */
+  void reset_distance();
+
+  /**
+   * Get the accumulated distnace since the last `reset_distance`.
+   * @returns the accumulated distance in meters per seconds.
+   * @see Speedmeter::reset_distance
+   */
+  float get_distance() const;
 };

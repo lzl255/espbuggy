@@ -10,12 +10,17 @@ protected:
   SpeedMeter *speedmeter;
   PidController pid;
   Ticker ticker;
+  float sampling_period;
+  /// Cap on the magnitude of power.
+  /// Should be in 0.0~1.0 inclusive.
+  float power_cap;
 
 private:
   void ticker_callback();
 
 public:
-  Wheel(Motor motor, SpeedMeter *speedmeter, PidController pid);
+  Wheel(Motor motor, SpeedMeter *speedmeter, PidController pid,
+        float sampling_period = 0.05f);
 
   /// Constructs the left wheel's abstraction using values in `ports`.
   /// @returns the wheel class abstracting the left wheel.
@@ -38,4 +43,16 @@ public:
   /// Get the current speed.
   /// @returns the current speed in meters per second.
   float get_current_speed() const;
+
+  void clear_pid();
+
+  void reset_distance();
+
+  float get_distance() const;
+
+  void set_power_cap(float power_cap);
+
+  float get_power_cap() const;
+
+  PidController *get_pid();
 };

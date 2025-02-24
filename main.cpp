@@ -25,29 +25,82 @@ template <typename T> T max(T x, T y) {
     return y;
 }
 
-class TickerTest {
-private:
-  DigitalOut red_led;
-  Ticker ticker;
+template <typename T> T abs(T x) {
+  if (x >= 0)
+    return x;
+  else
+    return -x;
+}
 
-private:
-  void ticker_callback() {
-    if (this->red_led.read() == 0)
-      this->red_led.write(1);
-    else
-      this->red_led.write(0);
-  }
-
-public:
-  TickerTest() : red_led(D5), ticker() {
-    this->ticker.attach(callback(this, &TickerTest::ticker_callback), 0.5f);
-  }
+enum WheelSide {
+  LEFT_WHEEL,
+  RIGHT_WHEEL,
 };
 
-static inline float ticks_to_speed(int d_ticks, float seconds) {
-  float tick_rate = (float)d_ticks / seconds;
-  return tick_rate * WHEEL_DIAMETER * PI / (512 * GEAR_RATIO);
-}
+class Buggy {
+  C12832 lcd;
+  Ticker display_refresh_ticker;
+  Wheel *wheel_left;
+  Wheel *wheel_right;
+
+public:
+  Buggy()
+      : lcd(D11, D13, D12, D7, D10), display_refresh_ticker(),
+        wheel_left(Wheel::left()), wheel_right(Wheel::right()) {
+    wheel_left->set_power_cap(0.5f);
+    wheel_right->set_power_cap(0.5f);
+    wheel_left->set_target_speed(0.04f);
+    wheel_right->set_target_speed(0.04f);
+    wheel_left->reset_distance();
+    wheel_right->reset_distance();
+    display_refresh_ticker.attach(
+        callback(this, &Buggy::display_refresh_callback), 1.f / 12.f);
+  }
+
+  void display_refresh_callback() {
+    this->lcd.cls();
+    this->lcd.locate(0, 0);
+    this->lcd.printf("D:%.3f/%.3f", this->wheel_left->get_distance(),
+                     this->wheel_right->get_distance());
+  }
+
+  void both_wheels(float distance_left, float distance_right) {
+      wheel_left->clear_pid();
+      wheel_right->clear_pid();
+    wheel_left->reset_distance();
+    wheel_right->reset_distance();
+    wheel_left->set_target_speed((distance_left < 0) ? -0.04f : 0.04f);
+    wheel_right->set_target_speed((distance_right < 0) ? -0.04f : 0.04f);
+    for (;;) {
+      if (abs(wheel_left->get_distance()) >= abs(distance_left))
+        wheel_left->set_target_speed(0.);
+      if (abs(wheel_right->get_distance()) >= abs(distance_right))
+        wheel_right->set_target_speed(0.);
+      if (wheel_left->get_target_speed() == 0. &&
+          wheel_right->get_target_speed() == 0.) {
+        break;
+      }
+    }
+  }
+
+  void one_wheel(WheelSide wheel_side, float distance) {
+    Wheel *wheel;
+    switch (wheel_side) {
+    case LEFT_WHEEL:
+      wheel = this->wheel_left;
+      break;
+    case RIGHT_WHEEL:
+      wheel = this->wheel_right;
+      break;
+    }
+    wheel->clear_pid();
+    wheel->reset_distance();
+    wheel->set_target_speed((distance > 0) ? 0.04f : -0.04f);
+    while (abs(wheel->get_distance()) < abs(distance))
+      ;
+    wheel->set_target_speed(0.f);
+  }
+};
 
 int main() {
   // Indicator for code is running.
@@ -61,21 +114,40 @@ int main() {
   DigitalOut drive_board_enable(ports::BOARD_ENABLE);
   drive_board_enable.write(true);
 
-  Wheel *wheel_left = Wheel::left();
-  Wheel *wheel_right = Wheel::right();
-  wheel_left->set_target_speed(0.04f);
-  wheel_right->set_target_speed(0.04f);
+  const float TURN_90 = 0.0073;
 
-  float wait_period = 1.f / 24.f; // 24 Hz
+  Buggy buggy;
+  buggy.both_wheels(0.01f, 0.01f);
+  wait(0.2f);
+  buggy.one_wheel(RIGHT_WHEEL, TURN_90);
+  wait(0.2f);
+  buggy.both_wheels(0.01f, 0.01f);
+  wait(0.2f);
+  buggy.one_wheel(RIGHT_WHEEL, TURN_90);
+  wait(0.2f);
+  buggy.both_wheels(0.01f, 0.01f);
+  wait(0.2f);
+  buggy.one_wheel(RIGHT_WHEEL, TURN_90);
+  wait(0.2f);
+  buggy.both_wheels(0.01f, 0.01f);
 
-  for (;;) {
-    wait(wait_period);
+  wait(0.2f);
+  buggy.both_wheels(-TURN_90, TURN_90);
 
-    lcd.cls();
-    lcd.locate(0, 0);
-    lcd.printf("V_L:%.4f V_R:%.4f", wheel_left->get_current_speed(),
-               wheel_right->get_current_speed());
-  }
+  wait(0.2f);
+  buggy.both_wheels(0.01f, 0.01f);
+  wait(0.2f);
+  buggy.one_wheel(LEFT_WHEEL, TURN_90);
+  wait(0.2f);
+  buggy.both_wheels(0.01f, 0.01f);
+  wait(0.2f);
+  buggy.one_wheel(LEFT_WHEEL, TURN_90);
+  wait(0.2f);
+  buggy.both_wheels(0.01f, 0.01f);
+  wait(0.2f);
+  buggy.one_wheel(LEFT_WHEEL, TURN_90);
+  wait(0.2f);
+  buggy.both_wheels(0.01f, 0.01f);
 
   drive_board_enable.write(false);
 }
