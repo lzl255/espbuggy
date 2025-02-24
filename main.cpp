@@ -49,8 +49,8 @@ public:
         wheel_left(Wheel::left()), wheel_right(Wheel::right()) {
     wheel_left->set_power_cap(0.5f);
     wheel_right->set_power_cap(0.5f);
-    wheel_left->set_target_speed(0.04f);
-    wheel_right->set_target_speed(0.04f);
+    wheel_left->set_target_speed(0.f);
+    wheel_right->set_target_speed(0.f);
     wheel_left->reset_distance();
     wheel_right->reset_distance();
     display_refresh_ticker.attach(
@@ -64,13 +64,14 @@ public:
                      this->wheel_right->get_distance());
   }
 
-  void both_wheels(float distance_left, float distance_right) {
-      wheel_left->clear_pid();
-      wheel_right->clear_pid();
+  void both_wheels(float distance_left, float distance_right,
+                   float speed = 0.04f) {
+    wheel_left->clear_pid();
+    wheel_right->clear_pid();
     wheel_left->reset_distance();
     wheel_right->reset_distance();
-    wheel_left->set_target_speed((distance_left < 0) ? -0.04f : 0.04f);
-    wheel_right->set_target_speed((distance_right < 0) ? -0.04f : 0.04f);
+    wheel_left->set_target_speed((distance_left < 0) ? -speed : speed);
+    wheel_right->set_target_speed((distance_right < 0) ? -speed : speed);
     for (;;) {
       if (abs(wheel_left->get_distance()) >= abs(distance_left))
         wheel_left->set_target_speed(0.);
@@ -81,9 +82,21 @@ public:
         break;
       }
     }
+
+    // Compensate for under/overshooting.
+    float overshot_distance_left = wheel_left->get_distance() - distance_left;
+    float overshot_distance_right =
+        wheel_right->get_distance() - distance_right;
+    if (abs(overshot_distance_left) <= 0.1f)
+      overshot_distance_left = 0.f;
+    if (abs(overshot_distance_right) <= 0.1f)
+      overshot_distance_right = 0.f;
+    if (overshot_distance_left != 0.f && overshot_distance_right != 0.f)
+      this->both_wheels(-overshot_distance_left, -overshot_distance_right,
+                        0.03f);
   }
 
-  void one_wheel(WheelSide wheel_side, float distance) {
+  void one_wheel(WheelSide wheel_side, float distance, float speed = 0.04f) {
     Wheel *wheel;
     switch (wheel_side) {
     case LEFT_WHEEL:
@@ -95,10 +108,16 @@ public:
     }
     wheel->clear_pid();
     wheel->reset_distance();
-    wheel->set_target_speed((distance > 0) ? 0.04f : -0.04f);
+    wheel->set_target_speed((distance > 0) ? speed : -speed);
     while (abs(wheel->get_distance()) < abs(distance))
       ;
     wheel->set_target_speed(0.f);
+
+    // Compensate for under/overshooting.
+    float overshot_distance = wheel->get_distance() - distance;
+    if (abs(overshot_distance) >= 0.1f) {
+      this->one_wheel(wheel_side, -overshot_distance, 0.03f);
+    }
   }
 };
 
@@ -114,40 +133,41 @@ int main() {
   DigitalOut drive_board_enable(ports::BOARD_ENABLE);
   drive_board_enable.write(true);
 
-  const float TURN_90 = 0.0073;
+  const float TURN_90 = 0.0085f;
+  const float HALF_METER = 0.01f;
 
   Buggy buggy;
-  buggy.both_wheels(0.01f, 0.01f);
+  buggy.both_wheels(HALF_METER, HALF_METER);
   wait(0.2f);
   buggy.one_wheel(RIGHT_WHEEL, TURN_90);
   wait(0.2f);
-  buggy.both_wheels(0.01f, 0.01f);
+  buggy.both_wheels(HALF_METER, HALF_METER);
   wait(0.2f);
   buggy.one_wheel(RIGHT_WHEEL, TURN_90);
   wait(0.2f);
-  buggy.both_wheels(0.01f, 0.01f);
+  buggy.both_wheels(HALF_METER, HALF_METER);
   wait(0.2f);
   buggy.one_wheel(RIGHT_WHEEL, TURN_90);
   wait(0.2f);
-  buggy.both_wheels(0.01f, 0.01f);
+  buggy.both_wheels(HALF_METER, HALF_METER);
 
   wait(0.2f);
   buggy.both_wheels(-TURN_90, TURN_90);
 
   wait(0.2f);
-  buggy.both_wheels(0.01f, 0.01f);
+  buggy.both_wheels(HALF_METER, HALF_METER);
   wait(0.2f);
   buggy.one_wheel(LEFT_WHEEL, TURN_90);
   wait(0.2f);
-  buggy.both_wheels(0.01f, 0.01f);
+  buggy.both_wheels(HALF_METER, HALF_METER);
   wait(0.2f);
   buggy.one_wheel(LEFT_WHEEL, TURN_90);
   wait(0.2f);
-  buggy.both_wheels(0.01f, 0.01f);
+  buggy.both_wheels(HALF_METER, HALF_METER);
   wait(0.2f);
   buggy.one_wheel(LEFT_WHEEL, TURN_90);
   wait(0.2f);
-  buggy.both_wheels(0.01f, 0.01f);
+  buggy.both_wheels(HALF_METER, HALF_METER);
 
   drive_board_enable.write(false);
 }

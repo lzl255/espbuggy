@@ -49,7 +49,7 @@ float Wheel::get_current_speed() const { return this->speedmeter->get_speed(); }
 void Wheel::reset_distance() { this->speedmeter->reset_distance(); }
 
 void Wheel::clear_pid() {
-    this->pid.clear_integral();
+    this->pid.reset();
 }
 
 float Wheel::get_distance() const { return this->speedmeter->get_distance(); }

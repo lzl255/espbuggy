@@ -29,5 +29,5 @@ public:
 
   float get_set_point() const;
 
-  void clear_integral();
+  void reset();
 };

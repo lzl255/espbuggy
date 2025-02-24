@@ -30,4 +30,7 @@ void PidController::set_set_point(float set_point) {
 
 float PidController::get_set_point() const { return this->set_point; }
 
-void PidController::clear_integral() { this->accumulator = 0; }
+void PidController::reset() {
+  this->accumulator = 0.f;
+  this->previous_error = 0.f;
+}
