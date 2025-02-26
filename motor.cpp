@@ -5,8 +5,8 @@
 
 Motor::Motor(PinName pin_direction, PinName pin_pwm, PinName pin_bipolar,
              bool direction_reversed, float initial_power)
-    : direction(pin_direction), pwm(pin_pwm), bipolar(pin_bipolar),
-      direction_reversed(direction_reversed), power(0.f) {
+    : direction(pin_direction), pwm(pin_pwm), bipolar(pin_bipolar), power(0.f),
+      direction_reversed(direction_reversed) {
   this->bipolar.write(false);
   this->pwm.period(0.005f);
   this->set_power(initial_power);
@@ -22,11 +22,11 @@ Motor Motor::right() {
 }
 
 int Motor::forward_direction() const {
-    return this->direction_reversed ? 0 : 1;
+  return this->direction_reversed ? 0 : 1;
 }
 
 int Motor::backward_direction() const {
-    return this->direction_reversed ? 1 : 0;
+  return this->direction_reversed ? 1 : 0;
 }
 
 void Motor::set_power(float power) {

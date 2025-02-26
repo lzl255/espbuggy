@@ -8,12 +8,11 @@
 class Potentiometer {
 private:
   AnalogIn input_signal;
-  float vdd;
   /// The normalized reading of the latest sample.
   float last_sample_normalized;
 
 public:
-  Potentiometer(PinName pin, float vdd);
+  Potentiometer(PinName pin);
 
   /** Get a new sample from the input signal.
    * @returns the sampled value in normalize form.

@@ -4,58 +4,42 @@
 #include <QEI.h>
 #include <mbed.h>
 
+#include "led.hpp"
 #include "motor.hpp"
 #include "pid.hpp"
 #include "ports.hpp"
 #include "potentiometer.hpp"
 #include "speedmeter.hpp"
+#include "utils.hpp"
 #include "wheel.hpp"
 
-template <typename T> T min(T x, T y) {
-  if (x > y)
-    return y;
-  else
-    return x;
-}
-
-template <typename T> T max(T x, T y) {
-  if (x > y)
-    return x;
-  else
-    return y;
-}
-
-template <typename T> T abs(T x) {
-  if (x >= 0)
-    return x;
-  else
-    return -x;
-}
-
-enum WheelSide {
-  LEFT_WHEEL,
-  RIGHT_WHEEL,
-};
+enum WheelSide { LEFT_WHEEL, RIGHT_WHEEL };
 
 class Buggy {
   C12832 lcd;
+  Led led;
   Ticker display_refresh_ticker;
   Wheel *wheel_left;
   Wheel *wheel_right;
 
 public:
   Buggy()
-      : lcd(D11, D13, D12, D7, D10), display_refresh_ticker(),
+      : lcd(D11, D13, D12, D7, D10), led(D5, D9, D8), display_refresh_ticker(),
         wheel_left(Wheel::left()), wheel_right(Wheel::right()) {
     wheel_left->set_power_cap(0.5f);
     wheel_right->set_power_cap(0.5f);
-    wheel_left->set_target_speed(0.f);
-    wheel_right->set_target_speed(0.f);
-    wheel_left->reset_distance();
-    wheel_right->reset_distance();
     display_refresh_ticker.attach(
         callback(this, &Buggy::display_refresh_callback), 1.f / 12.f);
   }
+
+  ~Buggy() {
+    delete this->wheel_left;
+    delete this->wheel_right;
+  }
+
+  Led *get_led() { return &this->led; }
+
+  const Led *get_led() const { return &this->led; }
 
   void display_refresh_callback() {
     this->lcd.cls();
@@ -65,9 +49,7 @@ public:
   }
 
   void both_wheels(float distance_left, float distance_right,
-                   float speed = 0.04f) {
-    wheel_left->clear_pid();
-    wheel_right->clear_pid();
+                   float speed = 0.03f, bool do_overshot_correction = false) {
     wheel_left->reset_distance();
     wheel_right->reset_distance();
     wheel_left->set_target_speed((distance_left < 0) ? -speed : speed);
@@ -77,26 +59,30 @@ public:
         wheel_left->set_target_speed(0.);
       if (abs(wheel_right->get_distance()) >= abs(distance_right))
         wheel_right->set_target_speed(0.);
-      if (wheel_left->get_target_speed() == 0. &&
-          wheel_right->get_target_speed() == 0.) {
+      if (is_zero(wheel_left->get_target_speed()) &&
+          is_zero(wheel_right->get_target_speed()))
         break;
-      }
     }
 
     // Compensate for under/overshooting.
-    float overshot_distance_left = wheel_left->get_distance() - distance_left;
-    float overshot_distance_right =
-        wheel_right->get_distance() - distance_right;
-    if (abs(overshot_distance_left) <= 0.1f)
-      overshot_distance_left = 0.f;
-    if (abs(overshot_distance_right) <= 0.1f)
-      overshot_distance_right = 0.f;
-    if (overshot_distance_left != 0.f && overshot_distance_right != 0.f)
-      this->both_wheels(-overshot_distance_left, -overshot_distance_right,
-                        0.03f);
+    if (do_overshot_correction) {
+      float overshot_distance_left = wheel_left->get_distance() - distance_left;
+      float overshot_distance_right =
+          wheel_right->get_distance() - distance_right;
+      if (abs(overshot_distance_left) <= 0.0005f)
+        overshot_distance_left = 0.f;
+      if (abs(overshot_distance_right) <= 0.0005f)
+        overshot_distance_right = 0.f;
+      if (overshot_distance_left != 0.f && overshot_distance_right != 0.f) {
+        this->get_led()->set_color(LedColor::red());
+        this->both_wheels(-overshot_distance_left, -overshot_distance_right,
+                          speed * 0.75f, false);
+      }
+    }
   }
 
-  void one_wheel(WheelSide wheel_side, float distance, float speed = 0.04f) {
+  void one_wheel(WheelSide wheel_side, float distance, float speed = 0.03f,
+                 bool do_overshot_correction = true) {
     Wheel *wheel;
     switch (wheel_side) {
     case LEFT_WHEEL:
@@ -106,68 +92,61 @@ public:
       wheel = this->wheel_right;
       break;
     }
-    wheel->clear_pid();
     wheel->reset_distance();
-    wheel->set_target_speed((distance > 0) ? speed : -speed);
+    wheel->set_target_speed((distance < 0) ? -speed : speed);
     while (abs(wheel->get_distance()) < abs(distance))
       ;
     wheel->set_target_speed(0.f);
 
-    // Compensate for under/overshooting.
-    float overshot_distance = wheel->get_distance() - distance;
-    if (abs(overshot_distance) >= 0.1f) {
-      this->one_wheel(wheel_side, -overshot_distance, 0.03f);
+    if (do_overshot_correction) {
+      float overshot_distance = wheel->get_distance() - distance;
+      if (abs(overshot_distance) >= 0.0005f) {
+        this->get_led()->set_color(LedColor::red());
+        this->one_wheel(wheel_side, -overshot_distance, speed * 0.75f, false);
+      }
     }
   }
 };
 
 int main() {
-  // Indicator for code is running.
-  PwmOut green_led(D9); // D9 -> mbed application shield LED green
-  green_led.period(.4f);
-  green_led.write(.5f);
-
-  C12832 lcd(D11, D13, D12, D7, D10);
-
   // The enable pin of the drive board.
   DigitalOut drive_board_enable(ports::BOARD_ENABLE);
   drive_board_enable.write(true);
 
   const float TURN_90 = 0.0085f;
+  const float TURN_180 = 0.0075f;
   const float HALF_METER = 0.01f;
 
   Buggy buggy;
-  buggy.both_wheels(HALF_METER, HALF_METER);
-  wait(0.2f);
-  buggy.one_wheel(RIGHT_WHEEL, TURN_90);
-  wait(0.2f);
-  buggy.both_wheels(HALF_METER, HALF_METER);
-  wait(0.2f);
-  buggy.one_wheel(RIGHT_WHEEL, TURN_90);
-  wait(0.2f);
-  buggy.both_wheels(HALF_METER, HALF_METER);
-  wait(0.2f);
-  buggy.one_wheel(RIGHT_WHEEL, TURN_90);
-  wait(0.2f);
-  buggy.both_wheels(HALF_METER, HALF_METER);
 
-  wait(0.2f);
-  buggy.both_wheels(-TURN_90, TURN_90);
+  buggy.get_led()->turn_on();
 
-  wait(0.2f);
-  buggy.both_wheels(HALF_METER, HALF_METER);
-  wait(0.2f);
-  buggy.one_wheel(LEFT_WHEEL, TURN_90);
-  wait(0.2f);
-  buggy.both_wheels(HALF_METER, HALF_METER);
-  wait(0.2f);
-  buggy.one_wheel(LEFT_WHEEL, TURN_90);
-  wait(0.2f);
-  buggy.both_wheels(HALF_METER, HALF_METER);
-  wait(0.2f);
-  buggy.one_wheel(LEFT_WHEEL, TURN_90);
-  wait(0.2f);
-  buggy.both_wheels(HALF_METER, HALF_METER);
+  for (uint32_t i = 0; i < 4; ++i) {
+    buggy.get_led()->set_color(LedColor::cyan());
+    buggy.both_wheels(HALF_METER, HALF_METER);
+    wait(.1f);
+    if (i != 3) {
+      buggy.get_led()->set_color(LedColor::magenta());
+      buggy.one_wheel(RIGHT_WHEEL, TURN_90);
+      wait(.1f);
+    }
+  }
 
+  buggy.get_led()->set_color(LedColor::yellow());
+  buggy.both_wheels(-TURN_180, TURN_180);
+  wait(.1f);
+
+  for (uint32_t i = 0; i < 4; ++i) {
+    buggy.get_led()->set_color(LedColor::cyan());
+    buggy.both_wheels(HALF_METER, HALF_METER);
+    wait(.1f);
+    if (i != 3) {
+      buggy.get_led()->set_color(LedColor::magenta());
+      buggy.one_wheel(LEFT_WHEEL, TURN_90);
+      wait(.1f);
+    }
+  }
+
+  buggy.get_led()->set_color(LedColor::green());
   drive_board_enable.write(false);
 }

@@ -19,8 +19,7 @@ private:
   void ticker_callback();
 
 public:
-  Wheel(Motor motor, SpeedMeter *speedmeter, PidController pid,
-        float sampling_period = 0.05f);
+  Wheel(Motor motor, SpeedMeter *speedmeter, float sampling_period = 0.05f);
 
   /// Constructs the left wheel's abstraction using values in `ports`.
   /// @returns the wheel class abstracting the left wheel.
@@ -46,9 +45,9 @@ public:
 
   void clear_pid();
 
-  void reset_distance();
+  void reset_distance() volatile;
 
-  float get_distance() const;
+  float get_distance() const volatile;
 
   void set_power_cap(float power_cap);
 

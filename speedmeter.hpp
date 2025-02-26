@@ -36,6 +36,7 @@ public:
       Uses port numbers as defined in `ports`.
       @param sampling_period the sampling period (in seconds)
       @returns the instance of speed calculator
+      @see ports
   */
   static SpeedMeter *for_encoder_a(float sampling_period = 0.04f);
 
@@ -44,6 +45,7 @@ public:
       Uses port numbers as defined in `ports`.
       @param sampling_period the sampling period (in seconds)
       @returns the instance of speed calculator
+      @see ports
   */
   static SpeedMeter *for_encoder_b(float sampling_period = 0.04f);
 

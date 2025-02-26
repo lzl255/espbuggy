@@ -27,4 +27,4 @@ namespace ports {
     static const PinName ENCODER_B_CHA = PC_2;
     /// Encoder B, channel B.
     static const PinName ENCODER_B_CHB = PC_3;
-}; // ports
+} // ports

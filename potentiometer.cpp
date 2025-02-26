@@ -1,6 +1,6 @@
 #include "potentiometer.hpp"
 
-Potentiometer::Potentiometer(PinName pin, float vdd)
+Potentiometer::Potentiometer(PinName pin)
     : input_signal(pin) {}
 
 float Potentiometer::sample() {
