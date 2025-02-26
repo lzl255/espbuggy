@@ -1,5 +1,7 @@
 #pragma once
 
+#include "stdint.h"
+
 #ifdef __clang__
 #define maybe_unused __attribute__((used))
 #else
@@ -30,4 +32,3 @@ template <typename T> static inline T abs(T x) {
   else
     return -x;
 }
-

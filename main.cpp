@@ -16,6 +16,7 @@
 enum WheelSide { LEFT_WHEEL, RIGHT_WHEEL };
 
 class Buggy {
+  DigitalOut drive_board_enable;
   C12832 lcd;
   Led led;
   Ticker display_refresh_ticker;
@@ -24,8 +25,10 @@ class Buggy {
 
 public:
   Buggy()
-      : lcd(D11, D13, D12, D7, D10), led(D5, D9, D8), display_refresh_ticker(),
-        wheel_left(Wheel::left()), wheel_right(Wheel::right()) {
+      : drive_board_enable(ports::BOARD_ENABLE), lcd(D11, D13, D12, D7, D10),
+        led(D5, D9, D8), display_refresh_ticker(), wheel_left(Wheel::left()),
+        wheel_right(Wheel::right()) {
+    drive_board_enable.write(true);
     wheel_left->set_power_cap(0.5f);
     wheel_right->set_power_cap(0.5f);
     display_refresh_ticker.attach(
@@ -33,6 +36,11 @@ public:
   }
 
   ~Buggy() {
+    this->drive_board_enable.write(false);
+    if (this->led.get_is_on())
+      this->led.turn_off();
+    this->lcd.cls();
+    this->display_refresh_ticker.detach();
     delete this->wheel_left;
     delete this->wheel_right;
   }
@@ -49,7 +57,7 @@ public:
   }
 
   void both_wheels(float distance_left, float distance_right,
-                   float speed = 0.03f, bool do_overshot_correction = false) {
+                   float speed = 0.03f) {
     wheel_left->reset_distance();
     wheel_right->reset_distance();
     wheel_left->set_target_speed((distance_left < 0) ? -speed : speed);
@@ -63,26 +71,9 @@ public:
           is_zero(wheel_right->get_target_speed()))
         break;
     }
-
-    // Compensate for under/overshooting.
-    if (do_overshot_correction) {
-      float overshot_distance_left = wheel_left->get_distance() - distance_left;
-      float overshot_distance_right =
-          wheel_right->get_distance() - distance_right;
-      if (abs(overshot_distance_left) <= 0.0005f)
-        overshot_distance_left = 0.f;
-      if (abs(overshot_distance_right) <= 0.0005f)
-        overshot_distance_right = 0.f;
-      if (overshot_distance_left != 0.f && overshot_distance_right != 0.f) {
-        this->get_led()->set_color(LedColor::red());
-        this->both_wheels(-overshot_distance_left, -overshot_distance_right,
-                          speed * 0.75f, false);
-      }
-    }
   }
 
-  void one_wheel(WheelSide wheel_side, float distance, float speed = 0.03f,
-                 bool do_overshot_correction = true) {
+  void one_wheel(WheelSide wheel_side, float distance, float speed = 0.03f) {
     Wheel *wheel;
     switch (wheel_side) {
     case LEFT_WHEEL:
@@ -97,22 +88,10 @@ public:
     while (abs(wheel->get_distance()) < abs(distance))
       ;
     wheel->set_target_speed(0.f);
-
-    if (do_overshot_correction) {
-      float overshot_distance = wheel->get_distance() - distance;
-      if (abs(overshot_distance) >= 0.0005f) {
-        this->get_led()->set_color(LedColor::red());
-        this->one_wheel(wheel_side, -overshot_distance, speed * 0.75f, false);
-      }
-    }
   }
 };
 
 int main() {
-  // The enable pin of the drive board.
-  DigitalOut drive_board_enable(ports::BOARD_ENABLE);
-  drive_board_enable.write(true);
-
   const float TURN_90 = 0.0085f;
   const float TURN_180 = 0.0075f;
   const float HALF_METER = 0.01f;
@@ -121,32 +100,32 @@ int main() {
 
   buggy.get_led()->turn_on();
 
+  // The first square.
   for (uint32_t i = 0; i < 4; ++i) {
-    buggy.get_led()->set_color(LedColor::cyan());
+    buggy.get_led()->set_color(Rgb::cyan());
     buggy.both_wheels(HALF_METER, HALF_METER);
     wait(.1f);
     if (i != 3) {
-      buggy.get_led()->set_color(LedColor::magenta());
+      buggy.get_led()->set_color(Rgb::magenta());
       buggy.one_wheel(RIGHT_WHEEL, TURN_90);
       wait(.1f);
     }
   }
 
-  buggy.get_led()->set_color(LedColor::yellow());
+  // The 180.
+  buggy.get_led()->set_color(Rgb::yellow());
   buggy.both_wheels(-TURN_180, TURN_180);
   wait(.1f);
 
+  // The second square.
   for (uint32_t i = 0; i < 4; ++i) {
-    buggy.get_led()->set_color(LedColor::cyan());
+    buggy.get_led()->set_color(Rgb::cyan());
     buggy.both_wheels(HALF_METER, HALF_METER);
     wait(.1f);
     if (i != 3) {
-      buggy.get_led()->set_color(LedColor::magenta());
+      buggy.get_led()->set_color(Rgb::magenta());
       buggy.one_wheel(LEFT_WHEEL, TURN_90);
       wait(.1f);
     }
   }
-
-  buggy.get_led()->set_color(LedColor::green());
-  drive_board_enable.write(false);
 }

@@ -5,7 +5,7 @@
 
 static const float K_P = 7.0f;
 static const float K_I = 1.f;
-static const float K_D = 0.f;
+static const float K_D = 0.2f;
 static const float I_LIMIT = 0.5f;
 
 void Wheel::ticker_callback() {
@@ -44,11 +44,11 @@ float Wheel::get_target_speed() const { return this->pid.get_set_point(); }
 
 float Wheel::get_current_speed() const { return this->speedmeter->get_speed(); }
 
-void Wheel::reset_distance() volatile { this->speedmeter->reset_distance(); }
+void Wheel::reset_distance() { this->speedmeter->reset_distance(); }
 
-void Wheel::clear_pid() { this->pid.reset(); }
+void Wheel::reset_pid() { this->pid.reset(); }
 
-float Wheel::get_distance() const volatile { return this->speedmeter->get_distance(); }
+float Wheel::get_distance() const { return this->speedmeter->get_distance(); }
 
 void Wheel::set_power_cap(float power_cap) {
   this->power_cap = clamp(power_cap, 0.f, 1.f);

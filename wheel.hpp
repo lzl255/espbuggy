@@ -43,11 +43,11 @@ public:
   /// @returns the current speed in meters per second.
   float get_current_speed() const;
 
-  void clear_pid();
+  void reset_pid();
 
-  void reset_distance() volatile;
+  void reset_distance();
 
-  float get_distance() const volatile;
+  float get_distance() const;
 
   void set_power_cap(float power_cap);
 
